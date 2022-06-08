@@ -4,6 +4,7 @@ import React, {
   useState,
   useRef,
   useEffect,
+  useReducer,
 } from "react";
 import "./App.css";
 import DiaryEditor from "./DiaryEditor";
@@ -11,8 +12,43 @@ import DiaryList from "./DiaryList";
 import Lifecycle from "./Lifecycle";
 import OptimizeTest from "./OptimizeTest";
 
+//useReducer에 들어가는 함수
+const reducer = (state, action) => {
+  switch (action.type) {
+    case "INIT": {
+      return action.data;
+    }
+    case "CREATE": {
+      const created_date = new Date().getDate();
+      const newItem = {
+        ...action.data,
+        created_date,
+      };
+      return [newItem, ...state];
+    }
+    case "REMOVE": {
+      return state.filter((it) => it.id !== action.targetId);
+    }
+    case "EDIT": {
+      return state.map((it) =>
+        it.id === action.targetId ? { ...it, content: action.newContent } : it
+      );
+    }
+    default:
+      return state;
+  }
+};
+
+// Context에 속한 외부 컴포넌트들이 사용할 수 있도록 export를 붙임
+// export default가 아닌 기본 export인데 이러면 다른 파일에서 비구조화 할당을 통해 import 해야함
+// ex. import App, {DiaryStateContext} from /App.js
+export const DiaryStateContext = React.createContext();
+export const DiaryDispatchContext = React.createContext();
+
 function App() {
-  const [data, setData] = useState([]);
+  // useState 대신 사용하는 useReducer
+  // useState 를 최적화해서 대신 사용하는 것이지만 useState를 사용해도 됨
+  const [data, dispatch] = useReducer(reducer, []);
 
   const dataId = useRef(0);
 
@@ -30,8 +66,8 @@ function App() {
         id: dataId.current++,
       };
     });
-
-    setData(initData);
+    //
+    dispatch({ type: "INIT", data: initData });
   };
 
   //처음 렌더링 될 때 실행함
@@ -40,29 +76,23 @@ function App() {
   }, []);
 
   const onCreate = useCallback((author, content, emotion) => {
-    const created_date = new Date().getTime();
-    const newItem = {
-      author,
-      content,
-      emotion,
-      created_date,
-      id: dataId.current,
-    };
+    dispatch({
+      type: "CREATE",
+      data: { author, content, emotion, id: dataId.current },
+    });
     dataId.current += 1;
-    //새로운 일기가 제일 위로 가야하므로 spread보다 앞에
-    setData((data) => [newItem, ...data]);
   }, []);
 
   const onRemove = useCallback((targetId) => {
-    setData((data) => data.filter((it) => it.id !== targetId));
+    dispatch({ type: "REMOVE", targetId });
   }, []);
 
   const onEdit = useCallback((targetId, newContent) => {
-    setData((data) =>
-      data.map((it) =>
-        it.id === targetId ? { ...it, content: newContent } : it
-      )
-    );
+    dispatch({ type: "EDIT", targetId, newContent });
+  }, []);
+
+  const memoizedDispatches = useMemo(() => {
+    return { onCreate, onRemove, onEdit };
   }, []);
 
   const getDiaryAnalysis = useMemo(() => {
@@ -75,17 +105,22 @@ function App() {
   const { goodCount, badCount, goodRatio } = getDiaryAnalysis;
 
   return (
-    <div className="App">
-      {/* <Lifecycle />
-      <OptimizeTest /> */}
+    // data는 DiaryStateContext로 사용
+    <DiaryStateContext.Provider value={data}>
+      <DiaryDispatchContext.Provider value={memoizedDispatches}>
+        <div className="App">
+          {/* <Lifecycle /> */}
+          {/* <OptimizeTest /> */}
 
-      <DiaryEditor onCreate={onCreate} />
-      <div>전체 일기 : {data.length}</div>
-      <div>기분이 좋은 일기 개수 : {goodCount}</div>
-      <div>기분이 나쁜 일기 개수 : {badCount}</div>
-      <div>기분 좋은 일기 비율 : {goodRatio}</div>
-      <DiaryList onEdit={onEdit} onRemove={onRemove} diaryList={data} />
-    </div>
+          <DiaryEditor />
+          <div>전체 일기 : {data.length}</div>
+          <div>기분이 좋은 일기 개수 : {goodCount}</div>
+          <div>기분이 나쁜 일기 개수 : {badCount}</div>
+          <div>기분 좋은 일기 비율 : {goodRatio}</div>
+          <DiaryList />
+        </div>
+      </DiaryDispatchContext.Provider>
+    </DiaryStateContext.Provider>
   );
 }
 
