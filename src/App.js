@@ -1,7 +1,15 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, {
+  useCallback,
+  useMemo,
+  useState,
+  useRef,
+  useEffect,
+} from "react";
 import "./App.css";
 import DiaryEditor from "./DiaryEditor";
 import DiaryList from "./DiaryList";
+import Lifecycle from "./Lifecycle";
+import OptimizeTest from "./OptimizeTest";
 
 function App() {
   const [data, setData] = useState([]);
@@ -22,6 +30,7 @@ function App() {
         id: dataId.current++,
       };
     });
+
     setData(initData);
   };
 
@@ -30,7 +39,7 @@ function App() {
     getData();
   }, []);
 
-  const onCreate = (author, content, emotion) => {
+  const onCreate = useCallback((author, content, emotion) => {
     const created_date = new Date().getTime();
     const newItem = {
       author,
@@ -42,31 +51,34 @@ function App() {
     dataId.current += 1;
     //새로운 일기가 제일 위로 가야하므로 spread보다 앞에
     setData((data) => [newItem, ...data]);
-  };
+  }, []);
 
-  const onRemove = (targetId) => {
+  const onRemove = useCallback((targetId) => {
     setData((data) => data.filter((it) => it.id !== targetId));
-  };
+  }, []);
 
-  const onEdit = (targetId, newContent) => {
+  const onEdit = useCallback((targetId, newContent) => {
     setData((data) =>
       data.map((it) =>
         it.id === targetId ? { ...it, content: newContent } : it
       )
     );
-  };
+  }, []);
 
-  const getDiaryAnalysis = () => {
+  const getDiaryAnalysis = useMemo(() => {
     const goodCount = data.filter((it) => it.emotion >= 3).length;
     const badCount = data.length - goodCount;
     const goodRatio = (goodCount / data.length) * 100;
     return { goodCount, badCount, goodRatio };
-  };
+  }, [data.length]);
 
-  const { goodCount, badCount, goodRatio } = getDiaryAnalysis();
+  const { goodCount, badCount, goodRatio } = getDiaryAnalysis;
 
   return (
     <div className="App">
+      {/* <Lifecycle />
+      <OptimizeTest /> */}
+
       <DiaryEditor onCreate={onCreate} />
       <div>전체 일기 : {data.length}</div>
       <div>기분이 좋은 일기 개수 : {goodCount}</div>
